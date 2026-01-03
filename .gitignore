@@ -3,3 +3,7 @@ dist/
 *.log
 .env
 .DS_Store
+tests/*.js
+tests/*.js.map
+tests/*.d.ts
+tests/*.d.ts.map

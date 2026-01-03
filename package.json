@@ -2,13 +2,16 @@
   "name": "local-felix",
   "version": "1.0.0",
   "description": "A TypeScript TUI chatbot using Ollama, LlamaIndex, and web search capabilities",
-  "main": "dist/index.js",
+  "main": "dist/src/index.js",
   "type": "module",
   "scripts": {
     "build": "tsc",
-    "start": "node dist/index.js",
-    "dev": "tsc && node dist/index.js",
-    "watch": "tsc --watch"
+    "start": "node dist/src/index.js",
+    "prestart": "npm run build",
+    "dev": "tsc && node dist/src/index.js",
+    "watch": "tsc --watch",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "keywords": [
     "chatbot",
@@ -30,6 +33,7 @@
   "devDependencies": {
     "@types/node": "^20.10.0",
     "@types/react": "^18.2.0",
+    "vitest": "^1.4.0",
     "typescript": "^5.3.0"
   }
 }
