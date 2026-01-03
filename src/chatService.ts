@@ -105,19 +105,44 @@ export class ChatService {
     if (searchIntent) {
       const searchQuery = this.extractSearchQuery(userMessage);
       await logLine(`search:start query="${searchQuery}"`);
-      const searchResults = await this.webSearch.search(searchQuery, 3);
+
+      // If query is site-specific, attempt direct domain search first
+      let searchResults: any[] = [];
+      const siteMatch = searchQuery.match(/^site:([^\s]+)\s*(.*)$/i);
+      if (siteMatch) {
+        const domain = siteMatch[1];
+        const term = siteMatch[2] || '';
+        await logLine(`search:domain-direct:start domain=${domain} term="${term}"`);
+        searchResults = await this.webSearch.searchDomainDirect(domain, term, 5);
+        if (searchResults.length > 0) {
+          await logLine(`search:domain-direct:success count=${searchResults.length}`);
+        } else {
+          await logLine('search:domain-direct:empty');
+        }
+      }
+
+      // Fallback to DuckDuckGo (site: or general)
+      if (searchResults.length === 0) {
+        const ddgResults = await this.webSearch.search(searchQuery, 3);
+        searchResults = ddgResults;
+      }
       
       if (searchResults.length > 0) {
         this.lastSearchResults = 'Web Search Results:\n' + this.webSearch.formatSearchResults(searchResults);
         contextParts.push(this.lastSearchResults);
         await logLine(`search:results count=${searchResults.length}`);
         
-        // Optionally fetch content from the first result
+        // Optionally fetch content from the first result (with error handling)
         if (searchResults[0]) {
-          const pageContent = await this.webSearch.fetchPageContent(searchResults[0].url);
-          if (pageContent) {
-            contextParts.push(`Content from ${searchResults[0].title}:\n${pageContent.substring(0, 2000)}...`);
-            await logLine('search:page:included');
+          try {
+            const pageContent = await this.webSearch.fetchPageContent(searchResults[0].url);
+            if (pageContent) {
+              contextParts.push(`Content from ${searchResults[0].title}:\n${pageContent.substring(0, 2000)}...`);
+              await logLine('search:page:included');
+            }
+          } catch (fetchErr: any) {
+            // Gracefully skip page content if fetch fails (too large, timeout, etc.)
+            await logLine(`search:page:skip reason="${fetchErr.message?.substring(0, 100) || 'unknown'}"`);
           }
         }
       }
@@ -227,21 +252,28 @@ export class ChatService {
    * Extracts the search query from the user's message
    */
   private extractSearchQuery(message: string): string {
-    // Remove common search prefixes
-    let query = message
-      .toLowerCase()
-      .replace(/^(search for|look up|find information about|what is|who is|when did|where is|find|search)\s+/i, '')
-      .trim();
+    const lowerMessage = message.toLowerCase().trim();
 
-    // Extract site-specific search (e.g., "Search memory.net for X" -> "site:memory.net X")
-    const siteMatch = query.match(/^([a-z0-9.-]+)\s+for\s+(.+)$/i);
+    // Extract site-specific search FIRST (e.g., "Search memory.net for X" -> "site:memory.net X")
+    // Pattern A: "search(es) [for] domain.ext for searchterm"
+    const siteMatch = lowerMessage.match(/search(?:es)?\s+(?:for\s+)?([a-z0-9.-]+\.[a-z]{2,})\s+for\s+(.+)$/i);
     if (siteMatch) {
       const [, domain, searchTerm] = siteMatch;
-      // Check if it looks like a domain
-      if (domain.includes('.') || domain.includes('-')) {
-        query = `site:${domain} ${searchTerm}`;
-      }
+      return `site:${domain} ${searchTerm.trim()}`;
     }
+
+    // Pattern B: "search on <domain> ..." OR "search <domain> ..." (without explicit "for")
+    const siteOnlyMatch = lowerMessage.match(/search(?:es)?(?:\s+on)?\s+([a-z0-9.-]+\.[a-z]{2,})(?:\s+(.*))?$/i);
+    if (siteOnlyMatch) {
+      const [, domain, rest] = siteOnlyMatch;
+      const term = (rest || '').trim();
+      return term ? `site:${domain} ${term}` : `site:${domain}`;
+    }
+
+    // Remove common search prefixes if no site-specific match
+    let query = lowerMessage
+      .replace(/^(search for|look up|find information about|what is|who is|when did|where is|find|search)\s+/i, '')
+      .trim();
 
     return query || message;
   }

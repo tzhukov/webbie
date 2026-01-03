@@ -9,6 +9,81 @@ export interface SearchResult {
 
 export class WebSearchTool {
   /**
+   * Attempts direct on-site search using common query params.
+   * Tries multiple endpoints and returns anchors pointing to the same domain.
+   */
+  async searchDomainDirect(domain: string, term: string, maxResults: number = 5): Promise<SearchResult[]> {
+    const endpoints = [
+      `https://${domain}/search?q=${encodeURIComponent(term)}`,
+      `https://${domain}/?s=${encodeURIComponent(term)}`,
+      `https://${domain}/search?query=${encodeURIComponent(term)}`,
+      `https://${domain}/?q=${encodeURIComponent(term)}`
+    ];
+
+    const words = term.toLowerCase().split(/\s+/).filter(w => w.length > 2);
+
+    const results: SearchResult[] = [];
+
+    for (const url of endpoints) {
+      try {
+        const response = await axios.get(url, {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+          },
+          timeout: 8000,
+          maxContentLength: 5_000_000,
+          maxBodyLength: 5_000_000
+        });
+
+        const $ = cheerio.load(response.data);
+        const anchors = $('a[href]');
+
+        anchors.each((_, el) => {
+          if (results.length >= maxResults) return false;
+
+          const href = $(el).attr('href') || '';
+          let resolved: string;
+          try {
+            resolved = new URL(href, url).toString();
+          } catch {
+            return;
+          }
+
+          const host = (() => {
+            try { return new URL(resolved).hostname; } catch { return ''; }
+          })();
+
+          if (!host.endsWith(domain)) return;
+
+          const text = ($(el).text() || '').trim();
+          const containerText = ($(el).closest('article, li, div, p').text() || '').replace(/\s+/g, ' ').trim();
+          const snippetSource = containerText || text;
+          const snippetLower = snippetSource.toLowerCase();
+
+          const hasKeyword = words.length === 0 || words.some(w => snippetLower.includes(w));
+          if (!hasKeyword) return;
+
+          if (text.length === 0 && snippetSource.length === 0) return;
+
+          results.push({
+            title: text || snippetSource.slice(0, 80),
+            url: resolved,
+            snippet: snippetSource.slice(0, 200)
+          });
+        });
+
+        if (results.length > 0) {
+          return results.slice(0, maxResults);
+        }
+      } catch (err) {
+        // try next endpoint
+        continue;
+      }
+    }
+
+    return results.slice(0, maxResults);
+  }
+  /**
    * Performs a web search using DuckDuckGo HTML search
    */
   async search(query: string, maxResults: number = 5): Promise<SearchResult[]> {
@@ -70,7 +145,8 @@ export class WebSearchTool {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
         },
         timeout: 10000,
-        maxContentLength: 1000000 // 1MB limit
+        maxContentLength: 5_000_000,
+        maxBodyLength: 5_000_000
       });
 
       const $ = cheerio.load(response.data);
