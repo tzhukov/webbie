@@ -9,7 +9,7 @@ interface ChatMessage {
 
 const App: React.FC = () => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [input, setInput] = useState('');
+  const [currentInput, setCurrentInput] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [chatService] = useState(() => new ChatService());
   const { exit } = useApp();
@@ -28,8 +28,8 @@ const App: React.FC = () => {
     if (isProcessing) return;
 
     if (key.return) {
-      const userInput = input.trim();
-      setInput('');
+      const userInput = currentInput.trim();
+      setCurrentInput('');
 
       if (!userInput) return;
 
@@ -67,9 +67,9 @@ const App: React.FC = () => {
         setIsProcessing(false);
       }
     } else if (key.backspace || key.delete) {
-      setInput(prev => prev.slice(0, -1));
+      setCurrentInput(prev => prev.slice(0, -1));
     } else if (!key.escape && !key.ctrl && !key.meta && input.length === 1) {
-      setInput(prev => prev + input);
+      setCurrentInput(prev => prev + input);
     }
   });
 
@@ -102,7 +102,7 @@ const App: React.FC = () => {
         <Text color="gray">
           {'> '}
         </Text>
-        <Text>{input}</Text>
+        <Text>{currentInput}</Text>
         <Text color="gray">▊</Text>
       </Box>
 
