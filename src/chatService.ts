@@ -166,8 +166,8 @@ export class ChatService {
         await logLine(`context: compiled:count=${contextParts.length}`);
       }
       const promptWithContext = context 
-        ? `${userMessage}\n\n${context}\n\nInstructions: Use the web search/RAG context above. Say "(from web search)" when you use it. If no useful context, answer concisely and say "(no web search used)".`
-        : `${userMessage}\n\nIf you did not receive any web context, answer concisely and say "(no web search used)".`;
+        ? `${userMessage}\n\n${context}\n\nInstructions: Use the web search/RAG context above. Say "(from web search)" when you use it. If no useful context, still answer concisely from your own knowledge and add "(no web search used)".`
+        : `${userMessage}\n\nNo web context was provided. Still answer concisely from your own knowledge and add "(no web search used)".`;
 
       // Get response from Ollama via LlamaIndex
       const response = await this.ollama.chat({
@@ -241,7 +241,19 @@ export class ChatService {
       'find',
       'latest',
       'current',
-      'news about'
+      'news about',
+      // how-to / guides / walkthroughs
+      'how to',
+      'how do i',
+      'walkthrough',
+      'guide',
+      'tutorial',
+      'steps',
+      'instructions',
+      'setup',
+      'install',
+      'configure',
+      'configuration'
     ];
 
     const lowerMessage = message.toLowerCase();

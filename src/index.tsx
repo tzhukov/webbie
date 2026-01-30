@@ -68,7 +68,8 @@ const App: React.FC = () => {
       }
     } else if (key.backspace || key.delete) {
       setCurrentInput(prev => prev.slice(0, -1));
-    } else if (!key.escape && !key.ctrl && !key.meta && input.length === 1) {
+    } else if (!key.escape && !key.ctrl && !key.meta && input.length >= 1) {
+      // Accept multi-character chunks to support paste
       setCurrentInput(prev => prev + input);
     }
   });
